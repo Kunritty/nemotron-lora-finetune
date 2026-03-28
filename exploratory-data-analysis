@@ -1,0 +1,592 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "d99d8bbc",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2026-03-28T06:09:50.562037Z",
+     "iopub.status.busy": "2026-03-28T06:09:50.561686Z",
+     "iopub.status.idle": "2026-03-28T06:09:51.843171Z",
+     "shell.execute_reply": "2026-03-28T06:09:51.842304Z"
+    },
+    "papermill": {
+     "duration": 1.287166,
+     "end_time": "2026-03-28T06:09:51.844930+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:50.557764+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'/kaggle/input/competitions/nvidia-nemotron-model-reasoning-challenge'"
+      ]
+     },
+     "execution_count": 1,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import kagglehub\n",
+    "\n",
+    "kagglehub.competition_download('nvidia-nemotron-model-reasoning-challenge')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "f0da00f5",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-28T06:09:51.849997Z",
+     "iopub.status.busy": "2026-03-28T06:09:51.849615Z",
+     "iopub.status.idle": "2026-03-28T06:09:52.977126Z",
+     "shell.execute_reply": "2026-03-28T06:09:52.976210Z"
+    },
+    "papermill": {
+     "duration": 1.131874,
+     "end_time": "2026-03-28T06:09:52.978796+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:51.846922+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div><style>\n",
+       ".dataframe > thead > tr,\n",
+       ".dataframe > tbody > tr {\n",
+       "  text-align: right;\n",
+       "  white-space: pre-wrap;\n",
+       "}\n",
+       "</style>\n",
+       "<small>shape: (5, 3)</small><table border=\"1\" class=\"dataframe\"><thead><tr><th>id</th><th>prompt</th><th>answer</th></tr><tr><td>str</td><td>str</td><td>str</td></tr></thead><tbody><tr><td>&quot;00066667&quot;</td><td>&quot;In Alice&#x27;s Wonderland, a secre…</td><td>&quot;10010111&quot;</td></tr><tr><td>&quot;000b53cf&quot;</td><td>&quot;In Alice&#x27;s Wonderland, a secre…</td><td>&quot;01000011&quot;</td></tr><tr><td>&quot;00189f6a&quot;</td><td>&quot;In Alice&#x27;s Wonderland, secret …</td><td>&quot;cat imagines book&quot;</td></tr><tr><td>&quot;001b24c4&quot;</td><td>&quot;In Alice&#x27;s Wonderland, numbers…</td><td>&quot;XXXVIII&quot;</td></tr><tr><td>&quot;001c63cb&quot;</td><td>&quot;In Alice&#x27;s Wonderland, secret …</td><td>&quot;wizard creates secret&quot;</td></tr></tbody></table></div>"
+      ],
+      "text/plain": [
+       "shape: (5, 3)\n",
+       "┌──────────┬─────────────────────────────────┬───────────────────────┐\n",
+       "│ id       ┆ prompt                          ┆ answer                │\n",
+       "│ ---      ┆ ---                             ┆ ---                   │\n",
+       "│ str      ┆ str                             ┆ str                   │\n",
+       "╞══════════╪═════════════════════════════════╪═══════════════════════╡\n",
+       "│ 00066667 ┆ In Alice's Wonderland, a secre… ┆ 10010111              │\n",
+       "│ 000b53cf ┆ In Alice's Wonderland, a secre… ┆ 01000011              │\n",
+       "│ 00189f6a ┆ In Alice's Wonderland, secret … ┆ cat imagines book     │\n",
+       "│ 001b24c4 ┆ In Alice's Wonderland, numbers… ┆ XXXVIII               │\n",
+       "│ 001c63cb ┆ In Alice's Wonderland, secret … ┆ wizard creates secret │\n",
+       "└──────────┴─────────────────────────────────┴───────────────────────┘"
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import polars as pl\n",
+    "\n",
+    "train = pl.read_csv('/kaggle/input/competitions/nvidia-nemotron-model-reasoning-challenge/train.csv')\n",
+    "\n",
+    "train.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "a24f131e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-28T06:09:52.984082Z",
+     "iopub.status.busy": "2026-03-28T06:09:52.983499Z",
+     "iopub.status.idle": "2026-03-28T06:09:52.988026Z",
+     "shell.execute_reply": "2026-03-28T06:09:52.987202Z"
+    },
+    "papermill": {
+     "duration": 0.00895,
+     "end_time": "2026-03-28T06:09:52.989694+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:52.980744+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Training Data:\n",
+      "n=9500\n"
+     ]
+    }
+   ],
+   "source": [
+    "print('Training Data:')\n",
+    "print(f'n={train.shape[0]}')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4e1bad50",
+   "metadata": {
+    "papermill": {
+     "duration": 0.001729,
+     "end_time": "2026-03-28T06:09:52.993353+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:52.991624+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Code to view a few different puzzles"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "8e4688be",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-28T06:09:52.998066Z",
+     "iopub.status.busy": "2026-03-28T06:09:52.997774Z",
+     "iopub.status.idle": "2026-03-28T06:09:53.010269Z",
+     "shell.execute_reply": "2026-03-28T06:09:53.008698Z"
+    },
+    "papermill": {
+     "duration": 0.016803,
+     "end_time": "2026-03-28T06:09:53.011934+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:52.995131+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret unit conversion is applied to measurements. For example:\n",
+      "32.58 m becomes 26.62\n",
+      "10.9 m becomes 8.90\n",
+      "17.86 m becomes 14.59\n",
+      "Now, convert the following measurement: 13.0 m\n",
+      "\n",
+      "Answer:\n",
+      "10.62\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.\n",
+      "\n",
+      "Here are some examples of input -> output:\n",
+      "10010110 -> 01011010\n",
+      "10010001 -> 01000110\n",
+      "10100001 -> 10000110\n",
+      "11010000 -> 01000011\n",
+      "10001000 -> 00100010\n",
+      "11110001 -> 11000111\n",
+      "01100001 -> 10000101\n",
+      "00000001 -> 00000100\n",
+      "00101010 -> 10101000\n",
+      "\n",
+      "Now, determine the output for: 11000101\n",
+      "\n",
+      "Answer:\n",
+      "00010111\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, the gravitational constant has been secretly changed. Here are some example observations:\n",
+      "For t = 3.13s, distance = 92.92 m\n",
+      "For t = 3.98s, distance = 150.24 m\n",
+      "For t = 1.39s, distance = 18.33 m\n",
+      "For t = 1.16s, distance = 12.76 m\n",
+      "Now, determine the falling distance for t = 3.67s given d = 0.5*g*t^2.\n",
+      "\n",
+      "Answer:\n",
+      "127.75\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, the gravitational constant has been secretly changed. Here are some example observations:\n",
+      "For t = 3.46s, distance = 50.25 m\n",
+      "For t = 1.67s, distance = 11.71 m\n",
+      "For t = 1.9s, distance = 15.15 m\n",
+      "Now, determine the falling distance for t = 4.79s given d = 0.5*g*t^2.\n",
+      "\n",
+      "Answer:\n",
+      "96.31\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret unit conversion is applied to measurements. For example:\n",
+      "47.83 m becomes 41.24\n",
+      "11.33 m becomes 9.77\n",
+      "19.38 m becomes 16.71\n",
+      "18.45 m becomes 15.91\n",
+      "Now, convert the following measurement: 46.52 m\n",
+      "\n",
+      "Answer:\n",
+      "40.11\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, secret encryption rules are used on text. Here are some examples:\n",
+      "ngel rijjiwz dhx zdeauqx zdiec -> bird follows the strange story\n",
+      "tugqhd zxxz fazdjx -> knight sees castle\n",
+      "ngel fexadxz dhx laet pidgiu -> bird creates the dark potion\n",
+      "eanngd lexayz dhx yaqgfaj txc -> rabbit dreams the magical key\n",
+      "tguq gyaqguxz qaelxu -> king imagines garden\n",
+      "Now, decrypt the following text: eanngd fexadxz aeikul ifxau\n",
+      "\n",
+      "Answer:\n",
+      "rabbit creates around ocean\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.\n",
+      "\n",
+      "Here are some examples of input -> output:\n",
+      "11111101 -> 01110101\n",
+      "01010000 -> 10101011\n",
+      "11011001 -> 11101101\n",
+      "10001010 -> 01110101\n",
+      "01111110 -> 10011000\n",
+      "10110001 -> 01010111\n",
+      "10100100 -> 01000111\n",
+      "10100110 -> 11001111\n",
+      "01010111 -> 01110110\n",
+      "01011100 -> 10011000\n",
+      "\n",
+      "Now, determine the output for: 10011100\n",
+      "\n",
+      "Answer:\n",
+      "10101001\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "5 -> V\n",
+      "12 -> XII\n",
+      "2 -> II\n",
+      "34 -> XXXIV\n",
+      "56 -> LVI\n",
+      "Now, write the number 98 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XCVIII\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "68 -> LXVIII\n",
+      "25 -> XXV\n",
+      "55 -> LV\n",
+      "2 -> II\n",
+      "93 -> XCIII\n",
+      "Now, write the number 11 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XI\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret set of transformation rules is applied to equations. Below are a few examples:\n",
+      "37@72 = 64\n",
+      "58!05 = 0524\n",
+      "71!56 = 5011\n",
+      "65?73 = 49\n",
+      "82!61 = 844\n",
+      "Now, determine the result for: 74!88\n",
+      "\n",
+      "Answer:\n",
+      "6314\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.\n",
+      "\n",
+      "Here are some examples of input -> output:\n",
+      "10010110 -> 11010011\n",
+      "01110011 -> 01101110\n",
+      "11110011 -> 01111111\n",
+      "10010011 -> 01110011\n",
+      "11010001 -> 00111011\n",
+      "11001000 -> 00011001\n",
+      "11101100 -> 10011101\n",
+      "11011000 -> 00011011\n",
+      "01111010 -> 01001111\n",
+      "\n",
+      "Now, determine the output for: 00110011\n",
+      "\n",
+      "Answer:\n",
+      "01100110\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, the gravitational constant has been secretly changed. Here are some example observations:\n",
+      "For t = 1.2s, distance = 11.02 m\n",
+      "For t = 1.4s, distance = 15.0 m\n",
+      "For t = 2.12s, distance = 34.39 m\n",
+      "Now, determine the falling distance for t = 1.6s given d = 0.5*g*t^2.\n",
+      "\n",
+      "Answer:\n",
+      "19.59\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, a secret bit manipulation rule transforms 8-bit binary numbers. The transformation involves operations like bit shifts, rotations, XOR, AND, OR, NOT, and possibly majority or choice functions.\n",
+      "\n",
+      "Here are some examples of input -> output:\n",
+      "11101000 -> 00010001\n",
+      "00101000 -> 00000000\n",
+      "01110011 -> 11000110\n",
+      "01111010 -> 10000100\n",
+      "11011101 -> 00011011\n",
+      "11010011 -> 10000010\n",
+      "01110101 -> 01001010\n",
+      "10011001 -> 00010011\n",
+      "11001100 -> 00011001\n",
+      "01100001 -> 01000000\n",
+      "\n",
+      "Now, determine the output for: 11101010\n",
+      "\n",
+      "Answer:\n",
+      "10010101\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "EXAMPLE_NUMS = range(10, 1500, 119)\n",
+    "for EXAMPLE_NUM in EXAMPLE_NUMS:\n",
+    "    print(f'Prompt:\\n{train['prompt'][EXAMPLE_NUM]}')\n",
+    "    print()\n",
+    "    print(f'Answer:\\n{train['answer'][EXAMPLE_NUM]}')\n",
+    "    print()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4f7af7a8",
+   "metadata": {
+    "papermill": {
+     "duration": 0.001959,
+     "end_time": "2026-03-28T06:09:53.015957+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:53.013998+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Insights #\n",
+    "\n",
+    "There seem to be only a couple different prompts prompts that a reworded over and over. All the puzzles seem to test model reasoning with transformations specifically.\n",
+    "\n",
+    "One interesting thing is that the puzzles with the numeral system seem to all use the Roman numeral system. I'm unsure whether the testing data will be the same. I wrote some code below to look at more of these numeral puzzles and it seems like all the training data follows the Roman system."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "eb1a393b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-28T06:09:53.021114Z",
+     "iopub.status.busy": "2026-03-28T06:09:53.020824Z",
+     "iopub.status.idle": "2026-03-28T06:09:53.142524Z",
+     "shell.execute_reply": "2026-03-28T06:09:53.140844Z"
+    },
+    "papermill": {
+     "duration": 0.126474,
+     "end_time": "2026-03-28T06:09:53.144382+00:00",
+     "exception": false,
+     "start_time": "2026-03-28T06:09:53.017908+00:00",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "2 -> II\n",
+      "32 -> XXXII\n",
+      "32 -> XXXII\n",
+      "87 -> LXXXVII\n",
+      "Now, write the number 98 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XCVIII\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "91 -> XCI\n",
+      "77 -> LXXVII\n",
+      "64 -> LXIV\n",
+      "36 -> XXXVI\n",
+      "51 -> LI\n",
+      "Now, write the number 3 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "III\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "3 -> III\n",
+      "59 -> LIX\n",
+      "40 -> XL\n",
+      "Now, write the number 17 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XVII\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "59 -> LIX\n",
+      "76 -> LXXVI\n",
+      "39 -> XXXIX\n",
+      "86 -> LXXXVI\n",
+      "Now, write the number 1 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "I\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "46 -> XLVI\n",
+      "69 -> LXIX\n",
+      "34 -> XXXIV\n",
+      "79 -> LXXIX\n",
+      "24 -> XXIV\n",
+      "Now, write the number 37 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XXXVII\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "64 -> LXIV\n",
+      "86 -> LXXXVI\n",
+      "41 -> XLI\n",
+      "94 -> XCIV\n",
+      "52 -> LII\n",
+      "Now, write the number 5 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "V\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "17 -> XVII\n",
+      "22 -> XXII\n",
+      "30 -> XXX\n",
+      "35 -> XXXV\n",
+      "70 -> LXX\n",
+      "Now, write the number 51 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "LI\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "33 -> XXXIII\n",
+      "28 -> XXVIII\n",
+      "60 -> LX\n",
+      "27 -> XXVII\n",
+      "Now, write the number 21 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XXI\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "59 -> LIX\n",
+      "44 -> XLIV\n",
+      "95 -> XCV\n",
+      "62 -> LXII\n",
+      "Now, write the number 36 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XXXVI\n",
+      "\n",
+      "Prompt:\n",
+      "In Alice's Wonderland, numbers are secretly converted into a different numeral system. Some examples are given below:\n",
+      "52 -> LII\n",
+      "14 -> XIV\n",
+      "65 -> LXV\n",
+      "Now, write the number 48 in the Wonderland numeral system.\n",
+      "\n",
+      "Answer:\n",
+      "XLVIII\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "numeral_examples = train.filter(pl.col('prompt').str.contains('(?i)numeral system'))\n",
+    "numeral_examples = numeral_examples[-10:]\n",
+    "\n",
+    "for row in numeral_examples.iter_rows(named=True):\n",
+    "    print(f'Prompt:\\n{row['prompt']}')\n",
+    "    print()\n",
+    "    print(f'Answer:\\n{row['answer']}')\n",
+    "    print()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "none",
+   "dataSources": [
+    {
+     "databundleVersionId": 16082784,
+     "sourceId": 129716,
+     "sourceType": "competition"
+    }
+   ],
+   "dockerImageVersionId": 31328,
+   "isGpuEnabled": false,
+   "isInternetEnabled": true,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.12"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 6.745412,
+   "end_time": "2026-03-28T06:09:53.564730+00:00",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2026-03-28T06:09:46.819318+00:00",
+   "version": "2.7.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
