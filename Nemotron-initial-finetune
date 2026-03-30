@@ -1,0 +1,1053 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "274a0c0a",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:28:15.425552Z",
+     "iopub.status.busy": "2026-03-30T03:28:15.425327Z",
+     "iopub.status.idle": "2026-03-30T03:28:15.428276Z",
+     "shell.execute_reply": "2026-03-30T03:28:15.428045Z"
+    },
+    "papermill": {
+     "duration": 0.005368,
+     "end_time": "2026-03-30T03:28:15.428758",
+     "exception": false,
+     "start_time": "2026-03-30T03:28:15.423390",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "SEED = 123"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "75f170be",
+   "metadata": {
+    "papermill": {
+     "duration": 0.000916,
+     "end_time": "2026-03-30T03:28:15.430685",
+     "exception": false,
+     "start_time": "2026-03-30T03:28:15.429769",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Code below is to fix permission error with ptxas-blackwell. Credit: [Aman Atar](https://www.kaggle.com/code/amanatar/nemotron-3-nano-blackwell-optimized-reasoning)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "af70b5d8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:28:15.432951Z",
+     "iopub.status.busy": "2026-03-30T03:28:15.432860Z",
+     "iopub.status.idle": "2026-03-30T03:28:18.408365Z",
+     "shell.execute_reply": "2026-03-30T03:28:18.408002Z"
+    },
+    "papermill": {
+     "duration": 2.977335,
+     "end_time": "2026-03-30T03:28:18.408983",
+     "exception": false,
+     "start_time": "2026-03-30T03:28:15.431648",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Triton ptxas fix applied ✓\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "import shutil, stat\n",
+    "\n",
+    "# ptxas-blackwell fix\n",
+    "src = \"/kaggle/usr/lib/notebooks/ryanholbrook/nvidia-utility-script/triton/backends/nvidia/bin/ptxas-blackwell\"\n",
+    "dst = \"/tmp/ptxas-blackwell\"\n",
+    "if os.path.exists(src):\n",
+    "    shutil.copy2(src, dst)\n",
+    "    os.chmod(dst, os.stat(dst).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)\n",
+    "\n",
+    "    import triton.backends.nvidia as nv_backend\n",
+    "    src_bin = os.path.join(os.path.dirname(nv_backend.__file__), \"bin\")\n",
+    "    dst_bin = \"/tmp/triton_nvidia_bin\"\n",
+    "    shutil.copytree(src_bin, dst_bin, dirs_exist_ok=True)\n",
+    "    for f in os.listdir(dst_bin):\n",
+    "        fp = os.path.join(dst_bin, f)\n",
+    "        if os.path.isfile(fp):\n",
+    "            os.chmod(fp, os.stat(fp).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)\n",
+    "\n",
+    "    nv_backend.__file__ = os.path.join(dst_bin, \"..\", \"__init__.py\")\n",
+    "    os.environ[\"TRITON_PTXAS_PATH\"]           = dst\n",
+    "    os.environ[\"TRITON_PTXAS_BLACKWELL_PATH\"] = dst\n",
+    "\n",
+    "    try:\n",
+    "        import triton.backends.nvidia.compiler as nv_compiler\n",
+    "        def _safe_get_ptxas_version(*args, **kwargs):\n",
+    "            return (12, 9, 0)\n",
+    "        nv_compiler.get_ptxas_version = _safe_get_ptxas_version\n",
+    "        print(\"Triton ptxas fix applied ✓\")\n",
+    "    except Exception as e:\n",
+    "        print(f\"Triton ptxas partial fix (non-fatal): {e}\")\n",
+    "else:\n",
+    "    print(\"ptxas-blackwell not found — continuing without fix\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8c73380a",
+   "metadata": {
+    "papermill": {
+     "duration": 0.000973,
+     "end_time": "2026-03-30T03:28:18.411198",
+     "exception": false,
+     "start_time": "2026-03-30T03:28:18.410225",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Code to load model + LoRa below is forked from [Ryan Holbrook](https://www.kaggle.com/code/ryanholbrook/nvidia-nemotron-submission-demo). Roughly 7 minutes to run:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "572a7950",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:28:18.413715Z",
+     "iopub.status.busy": "2026-03-30T03:28:18.413613Z",
+     "iopub.status.idle": "2026-03-30T03:40:58.883758Z",
+     "shell.execute_reply": "2026-03-30T03:40:58.883319Z"
+    },
+    "papermill": {
+     "duration": 760.472199,
+     "end_time": "2026-03-30T03:40:58.884360",
+     "exception": false,
+     "start_time": "2026-03-30T03:28:18.412161",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/kaggle/usr/lib/notebooks/ryanholbrook/nvidia-utility-script/torch/compiler/__init__.py:148: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  return torch._dynamo.allow_in_graph(fn)\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "7eab7c2665eb43959ee0c4f9dc792893",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Loading weights:   0%|          | 0/6243 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model loaded successfully.\n",
+      "Initializing LoRA adapter with rank=32...\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/usr/local/lib/python3.12/dist-packages/torchao/float8/float8_tensor.py:122: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/float8/float8_tensor.py:195: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/float8/float8_scaling_utils.py:90: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/float8/float8_linear.py:60: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/dtypes/nf4tensor.py:1059: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/quantization/subclass.py:206: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/quantization/subclass.py:355: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n",
+      "/usr/local/lib/python3.12/dist-packages/torchao/quantization/subclass.py:392: FutureWarning: torch._dynamo.allow_in_graph is deprecated and will be removed in a future version. Use torch._dynamo.nonstrict_trace instead.\n",
+      "  @torch._dynamo.allow_in_graph\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "trainable params: 880,138,240 || all params: 32,458,075,584 || trainable%: 2.7116\n"
+     ]
+    }
+   ],
+   "source": [
+    "import site\n",
+    "\n",
+    "cutlass_pkg_path = \"/kaggle/usr/lib/notebooks/ryanholbrook/nvidia-utility-script/nvidia_cutlass_dsl/python_packages/\"\n",
+    "site.addsitedir(cutlass_pkg_path)\n",
+    "\n",
+    "import kagglehub\n",
+    "import mamba_ssm\n",
+    "import torch\n",
+    "from peft import LoraConfig, get_peft_model, get_peft_model_state_dict, TaskType\n",
+    "from transformers import AutoModelForCausalLM, AutoTokenizer\n",
+    "\n",
+    "# Configuration\n",
+    "MODEL_PATH = kagglehub.model_download(\"metric/nemotron-3-nano-30b-a3b-bf16/transformers/default\")\n",
+    "OUTPUT_DIR = \"/kaggle/working\"\n",
+    "LORA_RANK = 32  # Can be set to a maximum of 32\n",
+    "\n",
+    "model = AutoModelForCausalLM.from_pretrained(\n",
+    "    MODEL_PATH,\n",
+    "    device_map=\"auto\",\n",
+    "    trust_remote_code=True,\n",
+    "    dtype=torch.bfloat16\n",
+    ")\n",
+    "tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)\n",
+    "print(\"Model loaded successfully.\")\n",
+    "\n",
+    "# Initialize LoRA Adapter\n",
+    "print(f\"Initializing LoRA adapter with rank={LORA_RANK}...\")\n",
+    "lora_config = LoraConfig(\n",
+    "    r=LORA_RANK,\n",
+    "    lora_alpha=16,\n",
+    "    target_modules=r\".*\\.(in_proj|out_proj|up_proj|down_proj)$\",\n",
+    "    lora_dropout=0.05,\n",
+    "    bias=\"none\",\n",
+    "    task_type=TaskType.CAUSAL_LM,\n",
+    ")\n",
+    "\n",
+    "# Apply LoRA to the model\n",
+    "model = get_peft_model(model, lora_config)\n",
+    "model.print_trainable_parameters()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "4803ae2b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:40:58.887581Z",
+     "iopub.status.busy": "2026-03-30T03:40:58.887327Z",
+     "iopub.status.idle": "2026-03-30T03:40:59.320810Z",
+     "shell.execute_reply": "2026-03-30T03:40:59.320447Z"
+    },
+    "papermill": {
+     "duration": 0.435688,
+     "end_time": "2026-03-30T03:40:59.321439",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:58.885751",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Total: n=9500\n",
+      "Train: n=8550\n",
+      "Eval:  n=950\n"
+     ]
+    }
+   ],
+   "source": [
+    "import polars as pl\n",
+    "\n",
+    "def load_train_test_split(csv_path, train_ratio=0.9, seed=123):\n",
+    "    df = pl.read_csv(csv_path)\n",
+    "    df = df.sample(fraction=1.0, seed=seed)\n",
+    "    \n",
+    "    split = int(len(df) * train_ratio)\n",
+    "    train = df[:split]\n",
+    "    eval = df[split:]\n",
+    "    \n",
+    "    print(f'Total: n={df.shape[0]}')\n",
+    "    print(f'Train: n={train.shape[0]}')\n",
+    "    print(f'Eval:  n={eval.shape[0]}')\n",
+    "    \n",
+    "    return train, eval\n",
+    "\n",
+    "train, eval = load_train_test_split('/kaggle/input/nvidia-nemotron-3-reasoning-challenge/train.csv', seed=SEED)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "64147ffe",
+   "metadata": {
+    "papermill": {
+     "duration": 0.001119,
+     "end_time": "2026-03-30T03:40:59.324004",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.322885",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "For now: Only use training sample of 200 rows beacuse of training speed + memory overheads"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "abaffc78",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:40:59.326894Z",
+     "iopub.status.busy": "2026-03-30T03:40:59.326625Z",
+     "iopub.status.idle": "2026-03-30T03:40:59.340135Z",
+     "shell.execute_reply": "2026-03-30T03:40:59.339881Z"
+    },
+    "papermill": {
+     "duration": 0.015493,
+     "end_time": "2026-03-30T03:40:59.340598",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.325105",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "#Sample\n",
+    "train_sample = train.sample(200, seed=SEED)\n",
+    "\n",
+    "#Format text with prompt and answer\n",
+    "train_texts = []\n",
+    "for row in train_sample.iter_rows(named=True):\n",
+    "    text = row['prompt'] + \"\\n\" + str(row['answer'])\n",
+    "    train_texts.append(text)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0f6a7b1d",
+   "metadata": {
+    "papermill": {
+     "duration": 0.001064,
+     "end_time": "2026-03-30T03:40:59.342783",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.341719",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Wrap training data to use with HuggingFace's Trainer:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "f03f8d4c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:40:59.345400Z",
+     "iopub.status.busy": "2026-03-30T03:40:59.345266Z",
+     "iopub.status.idle": "2026-03-30T03:40:59.983577Z",
+     "shell.execute_reply": "2026-03-30T03:40:59.983220Z"
+    },
+    "papermill": {
+     "duration": 0.640625,
+     "end_time": "2026-03-30T03:40:59.984487",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.343862",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from transformers import TrainingArguments, Trainer, DataCollatorForLanguageModeling\n",
+    "from torch.utils.data import Dataset\n",
+    "\n",
+    "#Dataset Wrapper for Pytorch Trainer\n",
+    "class PromptDataset(Dataset):\n",
+    "    def __init__(self, texts, tokenizer, max_length=512):\n",
+    "        self.encodings = tokenizer(\n",
+    "            texts, truncation=True, padding=\"max_length\",\n",
+    "            max_length=max_length, return_tensors=\"pt\"\n",
+    "        )\n",
+    "    def __len__(self):\n",
+    "        return len(self.encodings[\"input_ids\"])\n",
+    "    def __getitem__(self, idx):\n",
+    "        return {key: val[idx] for key, val in self.encodings.items()}\n",
+    "\n",
+    "#Fix for pad_token\n",
+    "if tokenizer.pad_token is None:\n",
+    "    tokenizer.pad_token = tokenizer.eos_token\n",
+    "    \n",
+    "dataset = PromptDataset(train_texts, tokenizer)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bf49d342",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00111,
+     "end_time": "2026-03-30T03:40:59.987064",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.985954",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "The model + LoRa takes up roughly 63GB. AdamW optimizer takes up roughly another 20GB"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "e7375180",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:40:59.989984Z",
+     "iopub.status.busy": "2026-03-30T03:40:59.989626Z",
+     "iopub.status.idle": "2026-03-30T03:53:56.136095Z",
+     "shell.execute_reply": "2026-03-30T03:53:56.135847Z"
+    },
+    "papermill": {
+     "duration": 776.148501,
+     "end_time": "2026-03-30T03:53:56.136658",
+     "exception": false,
+     "start_time": "2026-03-30T03:40:59.988157",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "\n",
+       "    <div>\n",
+       "      \n",
+       "      <progress value='75' max='75' style='width:300px; height:20px; vertical-align: middle;'></progress>\n",
+       "      [75/75 11:48, Epoch 3/3]\n",
+       "    </div>\n",
+       "    <table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       " <tr style=\"text-align: left;\">\n",
+       "      <th>Step</th>\n",
+       "      <th>Training Loss</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <td>10</td>\n",
+       "      <td>10.043250</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>20</td>\n",
+       "      <td>6.372723</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>30</td>\n",
+       "      <td>5.848561</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>40</td>\n",
+       "      <td>4.663008</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>50</td>\n",
+       "      <td>4.647334</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>60</td>\n",
+       "      <td>5.040866</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>70</td>\n",
+       "      <td>4.221867</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table><p>"
+      ],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "TrainOutput(global_step=75, training_loss=5.76242057800293, metrics={'train_runtime': 772.8589, 'train_samples_per_second': 0.776, 'train_steps_per_second': 0.097, 'total_flos': 5.91773258612736e+16, 'train_loss': 5.76242057800293, 'epoch': 3.0})"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "training_args = TrainingArguments(\n",
+    "    output_dir=\"./output\",\n",
+    "    num_train_epochs=3,\n",
+    "    per_device_train_batch_size=2,\n",
+    "    gradient_accumulation_steps=4,\n",
+    "    learning_rate=2e-4,\n",
+    "    bf16=True, #IMPORTANT for Nemotron               \n",
+    "    logging_steps=10,\n",
+    "    save_strategy=\"no\", #Change to epoch for long runs for failsafe\n",
+    "    dataloader_num_workers=4, #More GPU storage intensive to use 4. Use 2 for lighter load\n",
+    "    dataloader_pin_memory=True,\n",
+    "    # gradient_checkpointing=True, #Turn on to reduce GPU storage but increase training time\n",
+    ")\n",
+    "\n",
+    "trainer = Trainer(\n",
+    "    model=model,\n",
+    "    args=training_args,\n",
+    "    train_dataset=dataset,\n",
+    "    data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),\n",
+    ")\n",
+    "\n",
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "9efc1c91",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:53:56.140073Z",
+     "iopub.status.busy": "2026-03-30T03:53:56.139958Z",
+     "iopub.status.idle": "2026-03-30T03:53:58.612410Z",
+     "shell.execute_reply": "2026-03-30T03:53:58.612062Z"
+    },
+    "papermill": {
+     "duration": 2.47495,
+     "end_time": "2026-03-30T03:53:58.613224",
+     "exception": false,
+     "start_time": "2026-03-30T03:53:56.138274",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Saving adapter to /kaggle/working...\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Save Adapter\n",
+    "print(f\"Saving adapter to {OUTPUT_DIR}...\")\n",
+    "model.save_pretrained(OUTPUT_DIR)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "4f76d63b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-03-30T03:53:58.616492Z",
+     "iopub.status.busy": "2026-03-30T03:53:58.616387Z",
+     "iopub.status.idle": "2026-03-30T03:56:02.093004Z",
+     "shell.execute_reply": "2026-03-30T03:56:02.092780Z"
+    },
+    "papermill": {
+     "duration": 123.478815,
+     "end_time": "2026-03-30T03:56:02.093524",
+     "exception": false,
+     "start_time": "2026-03-30T03:53:58.614709",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "  adding: README.md (deflated 66%)\n",
+      "  adding: __notebook__.ipynb (deflated 76%)\n",
+      "  adding: adapter_config.json (deflated 55%)\n",
+      "  adding: adapter_model.safetensors (deflated 12%)\n",
+      "  adding: output/ (stored 0%)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "CompletedProcess(args='zip -m submission.zip *', returncode=0)"
+      ]
+     },
+     "execution_count": 9,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#For competition submission\n",
+    "import subprocess\n",
+    "\n",
+    "subprocess.run(\"zip -m submission.zip *\", shell=True, check=True)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "nvidiaRtxPro6000",
+   "dataSources": [
+    {
+     "databundleVersionId": 16082784,
+     "sourceId": 129716,
+     "sourceType": "competition"
+    },
+    {
+     "databundleVersionId": 16059913,
+     "modelId": 611168,
+     "modelInstanceId": 598905,
+     "sourceId": 784907,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "sourceId": 306236690,
+     "sourceType": "kernelVersion"
+    }
+   ],
+   "dockerImageVersionId": 31287,
+   "isGpuEnabled": true,
+   "isInternetEnabled": false,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.12"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 1672.108211,
+   "end_time": "2026-03-30T03:56:05.172953",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2026-03-30T03:28:13.064742",
+   "version": "2.6.0"
+  },
+  "widgets": {
+   "application/vnd.jupyter.widget-state+json": {
+    "state": {
+     "2d4f50790e3345a3a537eeecaf5b60a9": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "HTMLStyleModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "HTMLStyleModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "StyleView",
+       "background": null,
+       "description_width": "",
+       "font_size": null,
+       "text_color": null
+      }
+     },
+     "3175ca53bd844424abeff04a43dbcb01": {
+      "model_module": "@jupyter-widgets/base",
+      "model_module_version": "2.0.0",
+      "model_name": "LayoutModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/base",
+       "_model_module_version": "2.0.0",
+       "_model_name": "LayoutModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "LayoutView",
+       "align_content": null,
+       "align_items": null,
+       "align_self": null,
+       "border_bottom": null,
+       "border_left": null,
+       "border_right": null,
+       "border_top": null,
+       "bottom": null,
+       "display": null,
+       "flex": null,
+       "flex_flow": null,
+       "grid_area": null,
+       "grid_auto_columns": null,
+       "grid_auto_flow": null,
+       "grid_auto_rows": null,
+       "grid_column": null,
+       "grid_gap": null,
+       "grid_row": null,
+       "grid_template_areas": null,
+       "grid_template_columns": null,
+       "grid_template_rows": null,
+       "height": null,
+       "justify_content": null,
+       "justify_items": null,
+       "left": null,
+       "margin": null,
+       "max_height": null,
+       "max_width": null,
+       "min_height": null,
+       "min_width": null,
+       "object_fit": null,
+       "object_position": null,
+       "order": null,
+       "overflow": null,
+       "padding": null,
+       "right": null,
+       "top": null,
+       "visibility": null,
+       "width": null
+      }
+     },
+     "33cb028d8a634df393556e7368d50fd7": {
+      "model_module": "@jupyter-widgets/base",
+      "model_module_version": "2.0.0",
+      "model_name": "LayoutModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/base",
+       "_model_module_version": "2.0.0",
+       "_model_name": "LayoutModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "LayoutView",
+       "align_content": null,
+       "align_items": null,
+       "align_self": null,
+       "border_bottom": null,
+       "border_left": null,
+       "border_right": null,
+       "border_top": null,
+       "bottom": null,
+       "display": null,
+       "flex": null,
+       "flex_flow": null,
+       "grid_area": null,
+       "grid_auto_columns": null,
+       "grid_auto_flow": null,
+       "grid_auto_rows": null,
+       "grid_column": null,
+       "grid_gap": null,
+       "grid_row": null,
+       "grid_template_areas": null,
+       "grid_template_columns": null,
+       "grid_template_rows": null,
+       "height": null,
+       "justify_content": null,
+       "justify_items": null,
+       "left": null,
+       "margin": null,
+       "max_height": null,
+       "max_width": null,
+       "min_height": null,
+       "min_width": null,
+       "object_fit": null,
+       "object_position": null,
+       "order": null,
+       "overflow": null,
+       "padding": null,
+       "right": null,
+       "top": null,
+       "visibility": null,
+       "width": null
+      }
+     },
+     "386fa868d9ac45d9a7720596e953415f": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "ProgressStyleModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "ProgressStyleModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "StyleView",
+       "bar_color": null,
+       "description_width": ""
+      }
+     },
+     "7df9555afc8c48f09712778cd3738567": {
+      "model_module": "@jupyter-widgets/base",
+      "model_module_version": "2.0.0",
+      "model_name": "LayoutModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/base",
+       "_model_module_version": "2.0.0",
+       "_model_name": "LayoutModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "LayoutView",
+       "align_content": null,
+       "align_items": null,
+       "align_self": null,
+       "border_bottom": null,
+       "border_left": null,
+       "border_right": null,
+       "border_top": null,
+       "bottom": null,
+       "display": null,
+       "flex": null,
+       "flex_flow": null,
+       "grid_area": null,
+       "grid_auto_columns": null,
+       "grid_auto_flow": null,
+       "grid_auto_rows": null,
+       "grid_column": null,
+       "grid_gap": null,
+       "grid_row": null,
+       "grid_template_areas": null,
+       "grid_template_columns": null,
+       "grid_template_rows": null,
+       "height": null,
+       "justify_content": null,
+       "justify_items": null,
+       "left": null,
+       "margin": null,
+       "max_height": null,
+       "max_width": null,
+       "min_height": null,
+       "min_width": null,
+       "object_fit": null,
+       "object_position": null,
+       "order": null,
+       "overflow": null,
+       "padding": null,
+       "right": null,
+       "top": null,
+       "visibility": null,
+       "width": null
+      }
+     },
+     "7eab7c2665eb43959ee0c4f9dc792893": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "HBoxModel",
+      "state": {
+       "_dom_classes": [],
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "HBoxModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/controls",
+       "_view_module_version": "2.0.0",
+       "_view_name": "HBoxView",
+       "box_style": "",
+       "children": [
+        "IPY_MODEL_8c12904a3ea34a5b8aa3dea1ad0548db",
+        "IPY_MODEL_81fcdd5050a5400e8cd2b5cfc7f759f9",
+        "IPY_MODEL_d9f97bd3c65f4a80ae1616524eb83d5a"
+       ],
+       "layout": "IPY_MODEL_3175ca53bd844424abeff04a43dbcb01",
+       "tabbable": null,
+       "tooltip": null
+      }
+     },
+     "81fcdd5050a5400e8cd2b5cfc7f759f9": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "FloatProgressModel",
+      "state": {
+       "_dom_classes": [],
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "FloatProgressModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/controls",
+       "_view_module_version": "2.0.0",
+       "_view_name": "ProgressView",
+       "bar_style": "success",
+       "description": "",
+       "description_allow_html": false,
+       "layout": "IPY_MODEL_7df9555afc8c48f09712778cd3738567",
+       "max": 6243.0,
+       "min": 0.0,
+       "orientation": "horizontal",
+       "style": "IPY_MODEL_386fa868d9ac45d9a7720596e953415f",
+       "tabbable": null,
+       "tooltip": null,
+       "value": 6243.0
+      }
+     },
+     "8c12904a3ea34a5b8aa3dea1ad0548db": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "HTMLModel",
+      "state": {
+       "_dom_classes": [],
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "HTMLModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/controls",
+       "_view_module_version": "2.0.0",
+       "_view_name": "HTMLView",
+       "description": "",
+       "description_allow_html": false,
+       "layout": "IPY_MODEL_33cb028d8a634df393556e7368d50fd7",
+       "placeholder": "​",
+       "style": "IPY_MODEL_2d4f50790e3345a3a537eeecaf5b60a9",
+       "tabbable": null,
+       "tooltip": null,
+       "value": "Loading weights: 100%"
+      }
+     },
+     "c2d19eff8d844a05b354bfdc4d00bab4": {
+      "model_module": "@jupyter-widgets/base",
+      "model_module_version": "2.0.0",
+      "model_name": "LayoutModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/base",
+       "_model_module_version": "2.0.0",
+       "_model_name": "LayoutModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "LayoutView",
+       "align_content": null,
+       "align_items": null,
+       "align_self": null,
+       "border_bottom": null,
+       "border_left": null,
+       "border_right": null,
+       "border_top": null,
+       "bottom": null,
+       "display": null,
+       "flex": null,
+       "flex_flow": null,
+       "grid_area": null,
+       "grid_auto_columns": null,
+       "grid_auto_flow": null,
+       "grid_auto_rows": null,
+       "grid_column": null,
+       "grid_gap": null,
+       "grid_row": null,
+       "grid_template_areas": null,
+       "grid_template_columns": null,
+       "grid_template_rows": null,
+       "height": null,
+       "justify_content": null,
+       "justify_items": null,
+       "left": null,
+       "margin": null,
+       "max_height": null,
+       "max_width": null,
+       "min_height": null,
+       "min_width": null,
+       "object_fit": null,
+       "object_position": null,
+       "order": null,
+       "overflow": null,
+       "padding": null,
+       "right": null,
+       "top": null,
+       "visibility": null,
+       "width": null
+      }
+     },
+     "d4bd12fc0a84444f9c951aaaff86071f": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "HTMLStyleModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "HTMLStyleModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "StyleView",
+       "background": null,
+       "description_width": "",
+       "font_size": null,
+       "text_color": null
+      }
+     },
+     "d9f97bd3c65f4a80ae1616524eb83d5a": {
+      "model_module": "@jupyter-widgets/controls",
+      "model_module_version": "2.0.0",
+      "model_name": "HTMLModel",
+      "state": {
+       "_dom_classes": [],
+       "_model_module": "@jupyter-widgets/controls",
+       "_model_module_version": "2.0.0",
+       "_model_name": "HTMLModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/controls",
+       "_view_module_version": "2.0.0",
+       "_view_name": "HTMLView",
+       "description": "",
+       "description_allow_html": false,
+       "layout": "IPY_MODEL_c2d19eff8d844a05b354bfdc4d00bab4",
+       "placeholder": "​",
+       "style": "IPY_MODEL_d4bd12fc0a84444f9c951aaaff86071f",
+       "tabbable": null,
+       "tooltip": null,
+       "value": " 6243/6243 [11:13&lt;00:00,  1.18it/s]"
+      }
+     }
+    },
+    "version_major": 2,
+    "version_minor": 0
+   }
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
