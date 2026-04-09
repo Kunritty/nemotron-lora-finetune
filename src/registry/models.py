@@ -1,7 +1,9 @@
-# Ollama model registry: keep each profile's ollama_name aligned with `ollama list` after pulls.
-# Example pulls (adjust tags if you use different variants):
-#   ollama pull nemotron-3-nano:4b
-#   ollama pull gemma4:latest
+"""
+Ollama model registry: keep each profile's ollama_name aligned with `ollama list` after pulls.
+Example pulls (adjust tags if you use different variants):
+  ollama pull nemotron-3-nano:4b
+  ollama pull gemma4:latest
+"""
 
 from __future__ import annotations
 
