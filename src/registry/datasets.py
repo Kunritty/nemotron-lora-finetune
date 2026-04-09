@@ -9,7 +9,9 @@ STRATEGIES = {
 
 
 def _get_data_dir() -> Path:
+    """Download or fetch data directory"""
     return Path(kagglehub.competition_download(COMPETITION_SLUG))
 
 def get_train_csv() -> Path:    
+    """Get raw training data from Kaggle"""
     return _get_data_dir() / "train.csv"

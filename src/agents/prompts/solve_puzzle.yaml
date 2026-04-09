@@ -1,0 +1,12 @@
+solve_puzzle:
+  description: >
+    Solve the puzzle.
+
+    ADDITIONAL INSTRUCTIONS
+    -----------------------
+    - Use the provided context to solve the puzzle.
+    - The puzzle is a mathematical problem that requires the use of logical reasoning.
+
+  expected_output: >
+    The solution to the puzzle.
+  agent: puzzle_solver_agent

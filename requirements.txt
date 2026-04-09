@@ -2,6 +2,5 @@ kagglehub
 polars
 peft
 torch
-mamba_ssm
 transformers
-triton.backends.nvidia
+triton
