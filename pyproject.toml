@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nemotron-lora-finetune"
+version = "0.1.0"
+description = "Nemotron LoRA fine-tuning utilities"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "kagglehub",
+    "polars",
+    "peft",
+    "torch",
+    "transformers",
+    "triton",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
