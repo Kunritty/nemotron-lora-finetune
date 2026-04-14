@@ -63,12 +63,3 @@ def default_model_id() -> str:
     return DEFAULT_MODEL_ID
 
 
-__all__ = [
-    "DEFAULT_BASE_URL",
-    "DEFAULT_MODEL_ID",
-    "MODELS",
-    "OllamaModel",
-    "default_model_id",
-    "get_model",
-    "list_models",
-]
