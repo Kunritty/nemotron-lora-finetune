@@ -1,0 +1,42 @@
+"""
+Guidelines for tutor:
+To generate ideal synthetic data using a high-capacity "tutor" like Gemma 4 (31B) or Nemotron-4, you need to shift from simple prompting to a Structured Pipeline that optimizes for logic density and format consistency.
+
+Since you're working with the Nemotron 30B model—which has a hybrid Mamba-MoE architecture—your synthetic data needs to be hyper-focused on maintaining "state" without drifting.
+
+1. The "Decomposition & Re-Synthesis" Prompting
+Instead of asking the tutor to "solve the puzzle," use a Socratic CoT approach. This breaks the problem into a graph of sub-problems, which is much easier for your student model (Nemotron) to follow.
+
+The Prompt Structure:
+
+Step A (Decomposition): "Identify all atomic constraints in this puzzle. List them as specific logical rules."
+
+Step B (Exploration): "Generate three potential starting points. Evaluate each. Proceed with the most certain one."
+
+Step C (Verification): "After every logical deduction, state: 'Rule X applied to Y leads to Z'. Check for contradictions."
+
+2. Enforce "Bit-Serial" Reasoning (Kaggle Top-Tier Hack)
+Recent insights from the Nemotron Challenge suggest that "Parallel Reasoning" (doing multiple things at once) causes 30B models to hallucinate. For puzzles involving math or complex substitutions, force your tutor to generate Bit-Serial Traces.
+
+Instruction: "Do not calculate the result in one go. For every bit manipulation or cipher substitution, show the work for exactly one unit at a time.
+
+Example: Bit 0: 1 AND 0 = 0. Current state: [0].
+
+Example: Bit 1: 1 AND 1 = 1. Current state: [10]."
+
+Purpose: This creates "hyper-compressed" logic that the Nemotron 30B can mimic without hitting its 7,680 token limit.
+
+3. Iterative Self-Correction Traces
+A common failure for the 30B model is that it doesn't know how to recover from a mistake.
+
+The "Mistake Injection" Prompt: Ask Gemma 4 to: "Solve this puzzle, but at step 4, deliberately make a common logical error. Then, show the process of 'double-checking' that step, identifying the error, and correcting it."
+
+Purpose: Training on these "Self-Correction" traces is the only way to give a 30B model "unlimited-like" reasoning capabilities; it learns the circuit for error detection.
+
+4. Avoiding the "Format Clash" and "Gradient Collapse"
+One Kaggle participant recently dropped from a 90% synthetic accuracy to a 46% LB score because of two issues you must avoid:
+
+The Duplicate Trap: Ensure your generator doesn't use the exact same template for every trace. Use your tutor to paraphrase the reasoning steps (e.g., changing "Therefore" to "It follows that") so the model doesn't just memorize a text string.
+
+Token Alignment: Since Nemotron-3 uses a specific tokenizer, ensure your synthetic data doesn't include weird characters or LaTeX that the 30B model wasn't pre-trained on. Keep it in clean, structured Markdown.
+"""

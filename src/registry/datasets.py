@@ -28,9 +28,12 @@ STRATEGIES = {
         "function": lambda train: (train, None),
     }
 }
-def get_train_csv() -> Path:
+def _get_train_csv() -> Path:
     """Path to raw ``train.csv`` from the Kaggle competition download."""
     return get_data_dir() / "train.csv"
+
+def get_train_df() -> pl.DataFrame:
+    return pl.read_csv(_get_train_csv())
 
 # TODO: Add support for other datasets (e.g. synthetic.csv)
 def get_train_val_split(
@@ -57,5 +60,5 @@ def get_train_val_split(
     if holdout_category and split_fn is category_leave_one_out_split:
         args["holdout_category"] = holdout_category
 
-    train = pl.read_csv(get_train_csv())
+    train = get_train_df()
     return split_fn(train, **args)

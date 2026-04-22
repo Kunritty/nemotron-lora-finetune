@@ -14,11 +14,19 @@ dependencies = [
     "peft",
     "torch",
     "transformers",
-    "triton",
+    "langchain_ollama",
+    "langchain_core",
+    "pandas"
 ]
 
 [project.optional-dependencies]
-agents = ["ollama"]
+agents = [
+    "ollama"
+]
+
+training = [
+    "triton"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -4,7 +4,7 @@ this module for ground truth information on dataset and model usage.
 """
 
 from . import datasets as datasets
-from .datasets import get_train_csv, get_train_val_split
+from .datasets import get_train_df, get_train_val_split
 from .utils import datasets_utils as datasets_utils
 from .utils.datasets_utils import (
     CATEGORY_NAMES,
@@ -45,7 +45,7 @@ __all__ = [
     "get_data_dir",
     "get_model",
     "get_subsets",
-    "get_train_csv",
+    "get_train_df",
     "get_train_val_split",
     "holdout_split",
     "list_models",
