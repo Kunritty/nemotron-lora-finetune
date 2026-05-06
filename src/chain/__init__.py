@@ -23,7 +23,7 @@ from .prompts import (
     build_verify_messages,
     compose_system_prompt,
 )
-from .reasoning_chain import ReasoningChain
+from .reasoning_chain import ReasoningChain, SupportsInvokeMessages
 from .utils import convert_to_entry, entry_from_mapping
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "MessageStep",
     "PhaseResult",
     "ReasoningChain",
+    "SupportsInvokeMessages",
     "build_improve_messages",
     "build_reasoning_messages",
     "build_solve_messages",

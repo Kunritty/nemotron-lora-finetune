@@ -4,7 +4,7 @@ this module for ground truth information on dataset and model usage.
 """
 
 from . import datasets as datasets
-from .datasets import get_train_df, get_train_val_split
+from .datasets import get_train_csv_path, get_train_df, get_train_val_split
 from .utils import datasets_utils as datasets_utils
 from .utils.datasets_utils import (
     CATEGORY_NAMES,
@@ -17,6 +17,7 @@ from .utils.datasets_utils import (
     get_subsets,
     holdout_split,
 )
+from .hf_transformers_chat import TransformersChatLLM
 from .models import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL_ID,
@@ -24,6 +25,7 @@ from .models import (
     OllamaModel,
     default_model_id,
     get_model,
+    get_transformers_chat_model,
     list_models,
 )
 
@@ -44,11 +46,14 @@ __all__ = [
     "datasets_utils",
     "get_data_dir",
     "get_model",
+    "get_transformers_chat_model",
     "get_subsets",
+    "get_train_csv_path",
     "get_train_df",
     "get_train_val_split",
     "holdout_split",
     "list_models",
+    "TransformersChatLLM",
 ]
 
 # convenience alias

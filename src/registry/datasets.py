@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
@@ -10,6 +9,22 @@ from registry.utils.datasets_utils import (
     category_leave_one_out_split,
     get_data_dir,
 )
+
+
+def get_train_csv_path() -> Path:
+    """
+    Resolve ``train.csv`` for local vs Kaggle.
+
+    On Kaggle, prefers the first ``train.csv`` found under ``/kaggle/input``
+    (attached competition/datasets). Otherwise uses :func:`get_data_dir` via kagglehub.
+    """
+    kaggle_root = Path("/kaggle/input")
+    if kaggle_root.is_dir():
+        matches = sorted(kaggle_root.rglob("train.csv"))
+        for p in matches:
+            if p.is_file():
+                return p
+    return get_data_dir() / "train.csv"
 
 STRATEGIES = {
     "holdout": {
@@ -29,8 +44,8 @@ STRATEGIES = {
     }
 }
 def _get_train_csv() -> Path:
-    """Path to raw ``train.csv`` from the Kaggle competition download."""
-    return get_data_dir() / "train.csv"
+    """Path to raw ``train.csv`` (see :func:`get_train_csv_path`)."""
+    return get_train_csv_path()
 
 def get_train_df() -> pl.DataFrame:
     return pl.read_csv(_get_train_csv())
@@ -54,9 +69,8 @@ def get_train_val_split(
         raise ValueError(f"Unknown strategy: {strategy}")
     
     split_fn = STRATEGIES[strategy]["function"]
-    args = STRATEGIES[strategy]["args"]
+    args = dict(STRATEGIES[strategy].get("args") or {})
 
-    # Args specified in params override default strategy configs
     if holdout_category and split_fn is category_leave_one_out_split:
         args["holdout_category"] = holdout_category
 
