@@ -1,9 +1,20 @@
+import logging
 from collections.abc import Sequence
+from datetime import datetime
+from typing import Any, Protocol
 
-from langchain_ollama import ChatOllama
+from langchain_core.messages import BaseMessage
 
 from .data_types import DataPoint, Entry
 from .pipeline import ChainState, MessageStep, PhaseResult, default_message_steps
+
+logger = logging.getLogger(__name__)
+
+
+class SupportsInvokeMessages(Protocol):
+    """Anything compatible with LangChain chat models (``invoke([BaseMessage, ...])``)."""
+
+    def invoke(self, messages: list[BaseMessage], config: Any | None = None) -> Any: ...
 
 
 def _normalize_answer(text: str) -> str:
@@ -28,25 +39,38 @@ def _phase_block(name: str, reasoning: str, content: str) -> str:
     return "\n\n".join(lines).strip()
 
 
+def _now_ts() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
 class ReasoningChain:
     """
     Sequentially runs :class:`MessageStep` s (``build_messages`` → model ``invoke`` → append phase).
 
+    ``model`` may be :class:`langchain_ollama.ChatOllama`, :class:`registry.hf_transformers_chat.TransformersChatLLM`,
+    or any object matching :class:`SupportsInvokeMessages`.
+
     Pass ``steps=`` to define the pipeline, or omit it and set ``system_prompt`` /
     ``verify_system_prompt`` / ``improve_system_prompt`` to use
     :func:`~pipeline.default_message_steps`.
+
+    With ``verbose=True``, each :meth:`run` logs phase progress at INFO on this
+    module's logger and includes timestamps (configure root logging or
+    ``chain.reasoning_chain`` to see it).
     """
 
     def __init__(
         self,
-        model: ChatOllama,
+        model: SupportsInvokeMessages,
         *,
         steps: Sequence[MessageStep] | None = None,
         system_prompt: str | None = None,
         verify_system_prompt: str | None = None,
         improve_system_prompt: str | None = None,
+        verbose: bool = False,
     ):
         self._model = model
+        self._verbose = verbose
         if steps is not None:
             self._steps = tuple(steps)
         else:
@@ -62,9 +86,16 @@ class ReasoningChain:
     def steps(self) -> tuple[MessageStep, ...]:
         return self._steps
 
+    def _vlog(self, msg: str, *args: object) -> None:
+        if self._verbose:
+            logger.info("[%s] " + msg, _now_ts(), *args)
+
     def run(self, entry: Entry) -> DataPoint:
+        n = len(self._steps)
+        self._vlog("ReasoningChain.run start id=%s phases=%d", entry.id, n)
         state = ChainState(entry=entry)
-        for step in self._steps:
+        for i, step in enumerate(self._steps, start=1):
+            self._vlog("ReasoningChain.run phase %d/%d: %s", i, n, step.name)
             messages = step.build_messages(state)
             response = self._model.invoke(messages)
             state.phases.append(
@@ -74,6 +105,7 @@ class ReasoningChain:
                     content=str(getattr(response, "content", "")),
                 )
             )
+            self._vlog("ReasoningChain.run finished phase %d/%d: %s", i, n, step.name)
 
         last = state.last()
         final_answer = last.content
