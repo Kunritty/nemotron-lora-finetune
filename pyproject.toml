@@ -29,5 +29,11 @@ training = [
     "triton"
 ]
 
+kaggle = [
+    "casual_conv1d"
+    "mamba_ssm"
+    "open_clip"
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
