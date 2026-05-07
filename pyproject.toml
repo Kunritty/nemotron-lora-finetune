@@ -30,9 +30,9 @@ training = [
 ]
 
 kaggle = [
-    "casual_conv1d"
-    "mamba_ssm"
-    "open_clip"
+    "casual-conv1d"
+    "mamba-ssm"
+    "open-clip-torch"
 ]
 
 [tool.setuptools.packages.find]
