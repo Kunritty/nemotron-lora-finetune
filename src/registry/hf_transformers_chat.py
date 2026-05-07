@@ -96,7 +96,7 @@ class TransformersChatLLM:
             device_map=device_map,
             torch_dtype=dtype,
             trust_remote_code=trust_remote_code,
-            attn_implementation="sdpa"
+            attn_implementation="eager"
         )
         self._model.eval()
 
