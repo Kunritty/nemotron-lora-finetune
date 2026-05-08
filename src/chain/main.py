@@ -1,6 +1,5 @@
 import logging
 
-from langchain_ollama import ChatOllama
 from registry import models, datasets
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ def main():
     )
 
     logger.info("Step 1/5: Resolving ChatOllama model (gemma4)")
-    model: ChatOllama = models.get_model("gemma4")
+    model = models.get_model("gemma4")
     logger.info("Step 1/5: Model ready — %s", getattr(model, "model", model))
 
     logger.info("Step 2/5: Loading training dataframe")

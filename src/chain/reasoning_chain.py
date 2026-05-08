@@ -47,8 +47,8 @@ class ReasoningChain:
     """
     Sequentially runs :class:`MessageStep` s (``build_messages`` → model ``invoke`` → append phase).
 
-    ``model`` may be :class:`langchain_ollama.ChatOllama`, :class:`registry.hf_transformers_chat.TransformersChatLLM`,
-    or any object matching :class:`SupportsInvokeMessages`.
+    ``model`` may be any object matching :class:`SupportsInvokeMessages` (for example,
+    a LangChain chat model, or :class:`registry.transformers_chat.TransformersChatLLM`).
 
     Pass ``steps=`` to define the pipeline, or omit it and set ``system_prompt`` /
     ``verify_system_prompt`` / ``improve_system_prompt`` to use

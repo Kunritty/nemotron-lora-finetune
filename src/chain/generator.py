@@ -9,11 +9,10 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from langchain_ollama import ChatOllama
 
 from .data_types import DataPoint
 from .pipeline import MessageStep
-from .reasoning_chain import ReasoningChain
+from .reasoning_chain import ReasoningChain, SupportsInvokeMessages
 from .utils import entry_from_mapping
 
 logger = logging.getLogger(__name__)
@@ -72,7 +71,7 @@ class DatasetGenerator:
 
     def __init__(
         self,
-        model: ChatOllama,
+        model: SupportsInvokeMessages,
         *,
         steps: list[MessageStep] | tuple[MessageStep, ...] | None = None,
         system_prompt: str | None = None,

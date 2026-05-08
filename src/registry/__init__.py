@@ -17,17 +17,9 @@ from .utils.datasets_utils import (
     get_subsets,
     holdout_split,
 )
-from .hf_transformers_chat import TransformersChatLLM
-from .models import (
-    DEFAULT_BASE_URL,
-    DEFAULT_MODEL_ID,
-    MODELS,
-    OllamaModel,
-    default_model_id,
-    get_model,
-    get_transformers_chat_model,
-    list_models,
-)
+from .transformers_chat import TransformersChatLLM
+from .models import get_model, get_transformers_chat_model, list_models, default_model_id
+from .ollama import DEFAULT_BASE_URL, DEFAULT_MODEL_ID, MODELS, OllamaModel
 
 __all__ = [
     "CATEGORY_NAMES",

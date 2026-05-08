@@ -1,8 +1,8 @@
 """
-Hugging Face Transformers-backed chat model with a LangChain-shaped ``invoke(messages)`` API.
+Transformers-backed chat model with a LangChain-shaped ``invoke(messages)`` API.
 
 Use with :class:`chain.reasoning_chain.ReasoningChain` as a drop-in alternative to
-:class:`langchain_ollama.ChatOllama`.
+other LangChain chat models.
 """
 
 from __future__ import annotations
@@ -96,7 +96,7 @@ class TransformersChatLLM:
             device_map=device_map,
             torch_dtype=dtype,
             trust_remote_code=trust_remote_code,
-            attn_implementation="eager"
+            attn_implementation="eager",
         )
         self._model.eval()
 
@@ -149,3 +149,4 @@ class TransformersChatLLM:
         new_tokens = outputs[0, input_len:]
         text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
         return AIMessage(content=text, additional_kwargs={})
+
