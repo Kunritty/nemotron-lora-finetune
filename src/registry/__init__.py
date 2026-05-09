@@ -17,6 +17,7 @@ from .utils.datasets_utils import (
     get_subsets,
     holdout_split,
 )
+from .remote_code_model_compat import ensure_pretrained_submodule_cache
 from .transformers_chat import TransformersChatLLM
 from .models import get_model, get_transformers_chat_model, list_models, default_model_id
 from .ollama import DEFAULT_BASE_URL, DEFAULT_MODEL_ID, MODELS, OllamaModel
@@ -44,6 +45,7 @@ __all__ = [
     "get_train_df",
     "get_train_val_split",
     "holdout_split",
+    "ensure_pretrained_submodule_cache",
     "list_models",
     "TransformersChatLLM",
 ]

@@ -13,6 +13,8 @@ import torch
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from .remote_code_model_compat import ensure_pretrained_submodule_cache
+
 __all__ = ["TransformersChatLLM"]
 
 
@@ -98,6 +100,7 @@ class TransformersChatLLM:
             trust_remote_code=trust_remote_code,
             attn_implementation="eager",
         )
+        ensure_pretrained_submodule_cache(self._model)
         self._model.eval()
 
     @property
